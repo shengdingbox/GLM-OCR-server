@@ -62,6 +62,16 @@ python -c "import torch; print('[torch]', torch.__version__, 'cuda=', torch.vers
 echo [+] Installing FastAPI and image/PDF dependencies...
 python -m pip install fastapi uvicorn python-multipart pillow pypdfium2 accelerate
 
+echo [+] Installing optional layout dependencies (PaddleOCR)...
+python -m pip install --upgrade paddlepaddle
+if errorlevel 1 (
+    echo [!] paddlepaddle install failed. Layout OCR will use fallback mode.
+)
+python -m pip install --upgrade paddleocr
+if errorlevel 1 (
+    echo [!] paddleocr install failed. Layout OCR will use fallback mode.
+)
+
 echo [+] Installing transformers (development build)...
 python -m pip install git+https://github.com/huggingface/transformers.git
 

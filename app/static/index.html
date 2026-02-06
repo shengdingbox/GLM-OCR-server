@@ -96,6 +96,78 @@
 				color: var(--muted);
 			}
 
+			.label-title {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				line-height: 1.2;
+			}
+
+			.help-trigger {
+				position: relative;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				width: 16px;
+				height: 16px;
+				padding: 0;
+				border: 1px solid #93a3b3;
+				border-radius: 999px;
+				background: #fff;
+				color: #64748b;
+				font-size: 11px;
+				font-weight: 700;
+				line-height: 1;
+				cursor: pointer;
+			}
+
+			.help-trigger::before,
+			.help-trigger::after {
+				opacity: 0;
+				pointer-events: none;
+				transition: opacity 0.12s ease;
+			}
+
+			.help-trigger::before {
+				content: "";
+				position: absolute;
+				top: calc(100% + 2px);
+				left: 50%;
+				transform: translateX(-50%);
+				border-left: 6px solid transparent;
+				border-right: 6px solid transparent;
+				border-bottom: 6px solid #1f2937;
+				z-index: 5;
+			}
+
+			.help-trigger::after {
+				content: attr(data-help);
+				position: absolute;
+				top: calc(100% + 8px);
+				left: 50%;
+				transform: translateX(-50%);
+				z-index: 4;
+				width: 230px;
+				max-width: min(230px, 70vw);
+				padding: 8px 10px;
+				border-radius: 8px;
+				background: #1f2937;
+				color: #f8fafc;
+				font-size: 11px;
+				font-weight: 400;
+				text-align: left;
+				white-space: normal;
+			}
+
+			.help-trigger:hover::before,
+			.help-trigger:hover::after,
+			.help-trigger:focus-visible::before,
+			.help-trigger:focus-visible::after,
+			.help-trigger.is-open::before,
+			.help-trigger.is-open::after {
+				opacity: 1;
+			}
+
 			input,
 			select,
 			textarea,
@@ -229,6 +301,38 @@
 				margin-bottom: 8px;
 			}
 
+			.preview-image {
+				width: 100%;
+				height: auto;
+				border: 1px solid var(--line);
+				border-radius: 8px;
+				background: #fff;
+			}
+
+			.block-table-wrap {
+				overflow-x: auto;
+			}
+
+			.block-table {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 12px;
+				font-family: var(--mono);
+			}
+
+			.block-table th,
+			.block-table td {
+				border: 1px solid var(--line);
+				padding: 6px 8px;
+				vertical-align: top;
+			}
+
+			.block-table th {
+				background: #f4f7fb;
+				font-weight: 600;
+				text-align: left;
+			}
+
 			.hidden {
 				display: none;
 			}
@@ -251,42 +355,138 @@
 						<span class="tag" id="statusCuda">cuda: -</span>
 					</div>
 				</div>
-				<form id="analyzeForm">
-					<label class="span-2">
-						ファイル (画像/PDF)
-						<input id="file" name="file" type="file" accept=".pdf,image/*" required />
-					</label>
-					<label>
-						device
-						<select id="device" name="device">
-							<option value="auto" selected>auto</option>
-							<option value="cuda">cuda</option>
-							<option value="cpu">cpu</option>
-						</select>
-					</label>
-					<label>
-						dpi (PDF only)
-						<input id="dpi" name="dpi" type="number" min="72" max="600" value="220" />
-					</label>
-					<label>
-						task
-						<select id="task" name="task">
-							<option value="text" selected>Text</option>
-							<option value="table">Table</option>
-							<option value="formula">Formula</option>
-							<option value="extract_json">JSON抽出</option>
-						</select>
-					</label>
-					<label>
-						改行処理
-						<select id="linebreak_mode" name="linebreak_mode">
-							<option value="none" selected>処理しない</option>
-							<option value="paragraph">段落整形（空行維持）</option>
-							<option value="compact">強力整形（改行ほぼ除去）</option>
-						</select>
-					</label>
-					<label>
-						max_new_tokens
+					<form id="analyzeForm">
+						<label class="span-2">
+							<span class="label-title"
+								>ファイル (画像/PDF)
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="解析対象ファイルです。PDFはページごとに展開してOCRします。"
+									aria-label="ファイルの説明"
+								>
+									?
+								</button>
+							</span>
+							<input id="file" name="file" type="file" accept=".pdf,image/*" required />
+						</label>
+						<label>
+							<span class="label-title"
+								>task
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="認識タイプを指定します。text/table/formula/extract_json から選択します。"
+									aria-label="taskの説明"
+								>
+									?
+								</button>
+							</span>
+							<select id="task" name="task">
+								<option value="text" selected>Text</option>
+								<option value="table">Table</option>
+								<option value="formula">Formula</option>
+								<option value="extract_json">JSON抽出</option>
+							</select>
+						</label>
+						<label>
+							<span class="label-title"
+								>領域分割OCR
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="ONでレイアウト解析後に領域ごとOCRします。段組み・縦書き文書の読順崩れ対策向けです。"
+									aria-label="領域分割OCRの説明"
+								>
+									?
+								</button>
+							</span>
+							<select id="use_layout" name="use_layout">
+								<option value="false" selected>OFF (従来ページOCR)</option>
+								<option value="true">ON (PP-DocLayoutV3)</option>
+							</select>
+						</label>
+						<label>
+							<span class="label-title"
+								>reading_order
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="領域の結合順です。autoは自動推定、ltr_ttbは左から右、rtl_ttbは右から左、vertical_rlは縦書き右列優先です。"
+									aria-label="reading_orderの説明"
+								>
+									?
+								</button>
+							</span>
+							<select id="reading_order" name="reading_order">
+								<option value="auto" selected>auto</option>
+								<option value="ltr_ttb">ltr_ttb</option>
+								<option value="rtl_ttb">rtl_ttb</option>
+								<option value="vertical_rl">vertical_rl</option>
+							</select>
+						</label>
+						<label>
+							<span class="label-title"
+								>改行処理
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="OCR後の改行整形モードです。noneはそのまま、paragraphは段落維持、compactは改行を強く圧縮します。"
+									aria-label="改行処理の説明"
+								>
+									?
+								</button>
+							</span>
+							<select id="linebreak_mode" name="linebreak_mode">
+								<option value="none" selected>処理しない</option>
+								<option value="paragraph">段落整形（空行維持）</option>
+								<option value="compact">強力整形（改行ほぼ除去）</option>
+							</select>
+						</label>
+						<label>
+							<span class="label-title"
+								>device
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="推論に使う計算デバイスです。autoはCUDA利用可ならGPU、不可ならCPUを選びます。"
+									aria-label="deviceの説明"
+								>
+									?
+								</button>
+							</span>
+							<select id="device" name="device">
+								<option value="auto" selected>auto</option>
+								<option value="cuda">cuda</option>
+								<option value="cpu">cpu</option>
+							</select>
+						</label>
+						<label>
+							<span class="label-title"
+								>dpi (PDF only)
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="PDFを画像化する解像度です。高いほど精細ですが処理時間とメモリ消費が増えます。"
+									aria-label="dpiの説明"
+								>
+									?
+								</button>
+							</span>
+							<input id="dpi" name="dpi" type="number" min="72" max="600" value="220" />
+						</label>
+						<label>
+							<span class="label-title"
+								>max_new_tokens
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="1回の生成トークン上限です。大きいほど長文を返せますが遅くなります。"
+									aria-label="max_new_tokensの説明"
+								>
+									?
+								</button>
+							</span>
 							<input
 								id="max_new_tokens"
 								name="max_new_tokens"
@@ -295,23 +495,127 @@
 								max="32768"
 								value="1024"
 							/>
-					</label>
-					<label>
-						temperature
-						<input
-							id="temperature"
-							name="temperature"
-							type="number"
-							step="0.1"
-							min="0"
-							max="2"
-							value="0"
-						/>
-					</label>
-					<label id="schemaWrap" class="span-2 hidden">
-						schema (JSON Schema string)
-						<textarea id="schema" name="schema" placeholder='{"type":"object","properties":{"name":{"type":"string"}}}'></textarea>
-					</label>
+						</label>
+						<label>
+							<span class="label-title"
+								>temperature
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="生成のランダム性です。0は最も決定的、値を上げると多様になります。"
+									aria-label="temperatureの説明"
+								>
+									?
+								</button>
+							</span>
+							<input
+								id="temperature"
+								name="temperature"
+								type="number"
+								step="0.1"
+								min="0"
+								max="2"
+								value="0"
+							/>
+						</label>
+						<label>
+							<span class="label-title"
+								>layout backend
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="レイアウト解析器です。ppdoclayoutv3推奨。noneはページ全体を1領域として扱います。"
+									aria-label="layout backendの説明"
+								>
+									?
+								</button>
+							</span>
+							<select id="layout_backend" name="layout_backend">
+								<option value="ppdoclayoutv3" selected>ppdoclayoutv3</option>
+								<option value="none">none</option>
+							</select>
+						</label>
+						<label>
+							<span class="label-title"
+								>region_padding(px)
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="各領域の外側に足す余白です。文字切れ防止に有効ですが、大きすぎると隣接領域が混ざります。"
+									aria-label="region_paddingの説明"
+								>
+									?
+								</button>
+							</span>
+							<input
+								id="region_padding"
+								name="region_padding"
+								type="number"
+								min="0"
+								max="256"
+								value="12"
+							/>
+						</label>
+						<label>
+							<span class="label-title"
+								>max_regions
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="1ページで処理する領域の上限です。暴走防止用で、超過分は切り捨てます。"
+									aria-label="max_regionsの説明"
+								>
+									?
+								</button>
+							</span>
+							<input
+								id="max_regions"
+								name="max_regions"
+								type="number"
+								min="1"
+								max="1000"
+								value="200"
+							/>
+						</label>
+						<label>
+							<span class="label-title"
+								>region_parallelism
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="同時に回す領域推論数です。1が安全で、上げると速くなる場合がありますがVRAM使用量は増えます。"
+									aria-label="region_parallelismの説明"
+								>
+									?
+								</button>
+							</span>
+							<input
+								id="region_parallelism"
+								name="region_parallelism"
+								type="number"
+								min="1"
+								max="8"
+								value="1"
+							/>
+						</label>
+						<label id="schemaWrap" class="span-2 hidden">
+							<span class="label-title"
+								>schema (JSON Schema string)
+								<button
+									class="help-trigger"
+									type="button"
+									data-help="task が extract_json のとき必須です。出力したいJSON構造をスキーマで指定します。"
+									aria-label="schemaの説明"
+								>
+									?
+								</button>
+							</span>
+							<textarea
+								id="schema"
+								name="schema"
+								placeholder='{"type":"object","properties":{"name":{"type":"string"}}}'
+							></textarea>
+						</label>
 					<div class="actions">
 						<button id="submitBtn" type="submit">実行</button>
 						<button
@@ -333,6 +637,8 @@
 						<span class="tag" id="resultLinebreak">linebreak: -</span>
 						<span class="tag" id="resultPages">pages: -</span>
 						<span class="tag" id="resultDevice">run device: -</span>
+						<span class="tag" id="resultLayout">layout: -</span>
+						<span class="tag" id="resultOrder">order: -</span>
 						<button id="copyBtn" class="button-copy" type="button" disabled>
 							コピー
 						</button>
@@ -350,14 +656,20 @@
 		</div>
 
 		<script>
-				const form = document.getElementById("analyzeForm");
-				const submitBtn = document.getElementById("submitBtn");
-				const cancelBtn = document.getElementById("cancelBtn");
-				const copyBtn = document.getElementById("copyBtn");
-				const requestNote = document.getElementById("requestNote");
+			const form = document.getElementById("analyzeForm");
+			const submitBtn = document.getElementById("submitBtn");
+			const cancelBtn = document.getElementById("cancelBtn");
+			const copyBtn = document.getElementById("copyBtn");
+			const requestNote = document.getElementById("requestNote");
 			const taskInput = document.getElementById("task");
 			const schemaWrap = document.getElementById("schemaWrap");
 			const schemaInput = document.getElementById("schema");
+			const useLayoutInput = document.getElementById("use_layout");
+			const layoutBackendInput = document.getElementById("layout_backend");
+			const readingOrderInput = document.getElementById("reading_order");
+			const regionPaddingInput = document.getElementById("region_padding");
+			const maxRegionsInput = document.getElementById("max_regions");
+			const regionParallelismInput = document.getElementById("region_parallelism");
 			const pagePickerWrap = document.getElementById("pagePickerWrap");
 			const pageSelect = document.getElementById("pageSelect");
 			const resultBody = document.getElementById("resultBody");
@@ -369,22 +681,75 @@
 			const resultLinebreak = document.getElementById("resultLinebreak");
 			const resultPages = document.getElementById("resultPages");
 			const resultDevice = document.getElementById("resultDevice");
+			const resultLayout = document.getElementById("resultLayout");
+			const resultOrder = document.getElementById("resultOrder");
 
-				let currentResults = [];
-				let progressPollTimer = null;
-				let activeRequestId = null;
-				let currentViewItem = null;
-				let currentViewLabel = "";
-				let copyFeedbackTimer = null;
+			let currentResults = [];
+			let progressPollTimer = null;
+			let activeRequestId = null;
+			let currentViewItem = null;
+			let currentViewLabel = "";
+			let copyFeedbackTimer = null;
+				let currentMeta = {
+					useLayout: false,
+					readingOrder: "auto",
+					layoutBackend: "-",
+				};
+				const helpTriggers = Array.from(document.querySelectorAll(".help-trigger"));
+
+				function closeHelpBubbles(except = null) {
+					helpTriggers.forEach((btn) => {
+						if (except && btn === except) {
+							return;
+						}
+						btn.classList.remove("is-open");
+						btn.setAttribute("aria-expanded", "false");
+					});
+				}
+
+				function setupHelpBubbles() {
+					helpTriggers.forEach((btn) => {
+						btn.setAttribute("aria-expanded", "false");
+						btn.addEventListener("click", (event) => {
+							event.preventDefault();
+							event.stopPropagation();
+							const isOpen = btn.classList.contains("is-open");
+							closeHelpBubbles();
+							if (!isOpen) {
+								btn.classList.add("is-open");
+								btn.setAttribute("aria-expanded", "true");
+							}
+						});
+					});
+					document.addEventListener("click", () => closeHelpBubbles());
+					document.addEventListener("keydown", (event) => {
+						if (event.key === "Escape") {
+							closeHelpBubbles();
+						}
+					});
+				}
 
 			function taskNeedsSchema(task) {
 				return task === "extract_json";
+			}
+
+			function isLayoutEnabled() {
+				return useLayoutInput.value === "true";
 			}
 
 			function toggleSchema() {
 				const show = taskNeedsSchema(taskInput.value);
 				schemaWrap.classList.toggle("hidden", !show);
 				schemaInput.required = show;
+			}
+
+			function toggleLayoutOptions() {
+				const enabled = isLayoutEnabled();
+				layoutBackendInput.disabled = !enabled;
+				readingOrderInput.disabled = !enabled;
+				regionPaddingInput.disabled = !enabled;
+				maxRegionsInput.disabled = !enabled;
+				regionParallelismInput.disabled = !enabled;
 			}
 
 			function setBusy(isBusy, message) {
@@ -395,18 +760,22 @@
 				requestNote.textContent = message;
 			}
 
-				function setError(message) {
-					currentViewItem = null;
-					currentViewLabel = "";
-					copyBtn.disabled = true;
-					if (copyFeedbackTimer) {
-						clearTimeout(copyFeedbackTimer);
-						copyFeedbackTimer = null;
-					}
-					copyBtn.classList.remove("copied");
-					copyBtn.textContent = "コピー";
-					resultBody.innerHTML = "";
-					const card = document.createElement("div");
+			function resetCopyState() {
+				currentViewItem = null;
+				currentViewLabel = "";
+				copyBtn.disabled = true;
+				if (copyFeedbackTimer) {
+					clearTimeout(copyFeedbackTimer);
+					copyFeedbackTimer = null;
+				}
+				copyBtn.classList.remove("copied");
+				copyBtn.textContent = "コピー";
+			}
+
+			function setError(message) {
+				resetCopyState();
+				resultBody.innerHTML = "";
+				const card = document.createElement("div");
 				card.className = "card";
 				const pre = document.createElement("pre");
 				pre.textContent = message;
@@ -414,18 +783,10 @@
 				resultBody.appendChild(card);
 			}
 
-				function renderLoading(message = "解析中... しばらくお待ちください。") {
-					currentViewItem = null;
-					currentViewLabel = "";
-					copyBtn.disabled = true;
-					if (copyFeedbackTimer) {
-						clearTimeout(copyFeedbackTimer);
-						copyFeedbackTimer = null;
-					}
-					copyBtn.classList.remove("copied");
-					copyBtn.textContent = "コピー";
-					resultBody.innerHTML = "";
-					const card = document.createElement("div");
+			function renderLoading(message = "解析中... しばらくお待ちください。") {
+				resetCopyState();
+				resultBody.innerHTML = "";
+				const card = document.createElement("div");
 				card.className = "card";
 				const pre = document.createElement("pre");
 				pre.id = "loadingText";
@@ -467,17 +828,17 @@
 						const message = payload.message || "解析中...";
 						setBusy(true, message);
 						updateLoading(message);
-							if (payload.total_pages && Number(payload.total_pages) > 0) {
-								resultPages.textContent = `pages: ${payload.total_pages}`;
-							}
-							if (
-								payload.state === "done" ||
-								payload.state === "error" ||
-								payload.state === "canceled"
-							) {
-								stopProgressPolling();
-							}
-						} catch (error) {
+						if (payload.total_pages && Number(payload.total_pages) > 0) {
+							resultPages.textContent = `pages: ${payload.total_pages}`;
+						}
+						if (
+							payload.state === "done" ||
+							payload.state === "error" ||
+							payload.state === "canceled"
+						) {
+							stopProgressPolling();
+						}
+					} catch (error) {
 						// Keep silent during transient polling errors.
 					}
 				};
@@ -518,52 +879,97 @@
 				};
 			}
 
-				function renderResultItem(item, textLabel = "text", jsonLabel = "json", copyLabel = "") {
-					currentViewItem = item;
-					currentViewLabel = copyLabel;
-					copyBtn.disabled = false;
-					if (copyFeedbackTimer) {
-						clearTimeout(copyFeedbackTimer);
-						copyFeedbackTimer = null;
-					}
-					copyBtn.classList.remove("copied");
-					copyBtn.textContent = "コピー";
-					resultBody.innerHTML = "";
+			function createCard(title, content = null) {
+				const card = document.createElement("div");
+				card.className = "card";
+				if (title) {
+					const strong = document.createElement("strong");
+					strong.textContent = title;
+					card.appendChild(strong);
+					card.appendChild(document.createElement("hr"));
+				}
+				if (content) {
+					card.appendChild(content);
+				}
+				return card;
+			}
 
-				const textCard = document.createElement("div");
-				textCard.className = "card";
-				const textTitle = document.createElement("strong");
-				textTitle.textContent = textLabel;
-				const textPre = document.createElement("pre");
-				textPre.textContent = item.text || "";
-				textCard.appendChild(textTitle);
-				textCard.appendChild(document.createElement("hr"));
-				textCard.appendChild(textPre);
-				resultBody.appendChild(textCard);
+				function renderBlocksTable(blocks) {
+					const wrap = document.createElement("div");
+					wrap.className = "block-table-wrap";
+					const table = document.createElement("table");
+					table.className = "block-table";
+				const thead = document.createElement("thead");
+				thead.innerHTML =
+					"<tr><th>ID</th><th>type</th><th>bbox</th><th>truncated</th><th>text</th></tr>";
+				table.appendChild(thead);
+					const tbody = document.createElement("tbody");
+					blocks.forEach((block) => {
+						const tr = document.createElement("tr");
+						const bbox = block.bbox || {};
+						const bboxText = `(${bbox.x1 ?? "-"},${bbox.y1 ?? "-"})-(${bbox.x2 ?? "-"},${bbox.y2 ?? "-"})`;
+						const snippet = String(block.text || "").slice(0, 280);
+						const values = [
+							String(block.id || ""),
+							String(block.type || ""),
+							bboxText,
+							String(Boolean(block.truncated)),
+							snippet,
+						];
+						values.forEach((value) => {
+							const td = document.createElement("td");
+							td.textContent = value;
+							tr.appendChild(td);
+						});
+						tbody.appendChild(tr);
+					});
+					table.appendChild(tbody);
+					wrap.appendChild(table);
+					return wrap;
+			}
 
-				if (item.json !== null && item.json !== undefined) {
-					const jsonCard = document.createElement("div");
-					jsonCard.className = "card";
-					const jsonTitle = document.createElement("strong");
-					jsonTitle.textContent = jsonLabel;
-					const jsonPre = document.createElement("pre");
-					jsonPre.textContent = JSON.stringify(item.json, null, 2);
-					jsonCard.appendChild(jsonTitle);
-					jsonCard.appendChild(document.createElement("hr"));
-					jsonCard.appendChild(jsonPre);
-					resultBody.appendChild(jsonCard);
+			function renderResultItem(item, textLabel = "text", jsonLabel = "json", copyLabel = "") {
+				currentViewItem = item;
+				currentViewLabel = copyLabel;
+				copyBtn.disabled = false;
+				if (copyFeedbackTimer) {
+					clearTimeout(copyFeedbackTimer);
+					copyFeedbackTimer = null;
+				}
+				copyBtn.classList.remove("copied");
+				copyBtn.textContent = "コピー";
+				resultBody.innerHTML = "";
+
+				if (item.layout_preview_base64) {
+					const img = document.createElement("img");
+					img.className = "preview-image";
+					img.alt = "layout preview";
+					img.src = `data:image/png;base64,${item.layout_preview_base64}`;
+					resultBody.appendChild(createCard("layout_preview", img));
 				}
 
-				const rawCard = document.createElement("div");
-				rawCard.className = "card";
+				if (Array.isArray(item.blocks) && item.blocks.length > 0) {
+					resultBody.appendChild(createCard("blocks", renderBlocksTable(item.blocks)));
+				}
+
+				const textPre = document.createElement("pre");
+				textPre.textContent = item.text || "";
+				resultBody.appendChild(createCard(textLabel, textPre));
+
+				if (item.json !== null && item.json !== undefined) {
+					const jsonPre = document.createElement("pre");
+					jsonPre.textContent = JSON.stringify(item.json, null, 2);
+					resultBody.appendChild(createCard(jsonLabel, jsonPre));
+				}
+
+				const rawPre = document.createElement("pre");
+				rawPre.textContent = item.raw || "";
 				const details = document.createElement("details");
 				const summary = document.createElement("summary");
 				summary.textContent = "raw (debug)";
-				const rawPre = document.createElement("pre");
-				rawPre.textContent = item.raw || "";
 				details.appendChild(summary);
 				details.appendChild(rawPre);
-				rawCard.appendChild(details);
+				const rawCard = createCard("", details);
 				if (item.error) {
 					const err = document.createElement("pre");
 					err.textContent = item.error;
@@ -572,82 +978,86 @@
 				resultBody.appendChild(rawCard);
 			}
 
-				function renderPage(index) {
-					const item = currentResults[index];
-					if (!item) {
-						setError("結果のページが見つかりません。");
-						return;
-					}
-					renderResultItem(item, "text", "json", `Page ${item.page}`);
+			function renderPage(index) {
+				const item = currentResults[index];
+				if (!item) {
+					setError("結果のページが見つかりません。");
+					return;
 				}
-
-				function renderAllPages() {
-					renderResultItem(combineAllPages(currentResults), "text (ALL)", "json (ALL)", "ALL");
+				if (item.reading_order) {
+					resultOrder.textContent = `order: ${item.reading_order}`;
 				}
+				renderResultItem(item, "text", "json", `Page ${item.page}`);
+			}
 
-				function buildCopyText(item, label) {
-					if (!item) {
-						return "";
-					}
-					const parts = [];
-					if (label) {
-						parts.push(`# ${label}`);
-					}
-					if (item.text) {
-						parts.push(`[text]\n${item.text}`);
-					}
-					if (item.json !== null && item.json !== undefined) {
-						parts.push(`[json]\n${JSON.stringify(item.json, null, 2)}`);
-					}
-					if (item.error) {
-						parts.push(`[error]\n${item.error}`);
-					}
-					return parts.join("\n\n").trim();
+			function renderAllPages() {
+				resultOrder.textContent = `order: ${currentMeta.readingOrder || "-"}`;
+				renderResultItem(combineAllPages(currentResults), "text (ALL)", "json (ALL)", "ALL");
+			}
+
+			function buildCopyText(item, label) {
+				if (!item) {
+					return "";
 				}
+				const parts = [];
+				if (label) {
+					parts.push(`# ${label}`);
+				}
+				if (item.text) {
+					parts.push(`[text]\n${item.text}`);
+				}
+				if (item.json !== null && item.json !== undefined) {
+					parts.push(`[json]\n${JSON.stringify(item.json, null, 2)}`);
+				}
+				if (item.error) {
+					parts.push(`[error]\n${item.error}`);
+				}
+				return parts.join("\n\n").trim();
+			}
 
-				function showCopyFeedback(message, copied = false) {
-					requestNote.textContent = message;
-					if (copyFeedbackTimer) {
-						clearTimeout(copyFeedbackTimer);
+			function showCopyFeedback(message, copied = false) {
+				requestNote.textContent = message;
+				if (copyFeedbackTimer) {
+					clearTimeout(copyFeedbackTimer);
+					copyFeedbackTimer = null;
+				}
+				copyBtn.classList.toggle("copied", copied);
+				copyBtn.textContent = copied ? "コピー済み" : "コピー";
+				if (copied) {
+					copyFeedbackTimer = setTimeout(() => {
+						copyBtn.classList.remove("copied");
+						copyBtn.textContent = "コピー";
 						copyFeedbackTimer = null;
-					}
-					copyBtn.classList.toggle("copied", copied);
-					copyBtn.textContent = copied ? "コピー済み" : "コピー";
-					if (copied) {
-						copyFeedbackTimer = setTimeout(() => {
-							copyBtn.classList.remove("copied");
-							copyBtn.textContent = "コピー";
-							copyFeedbackTimer = null;
-						}, 1200);
-					}
+					}, 1200);
 				}
+			}
 
-				async function copyCurrentView() {
-					const text = buildCopyText(currentViewItem, currentViewLabel);
-					if (!text) {
-						return;
-					}
+			async function copyCurrentView() {
+				const text = buildCopyText(currentViewItem, currentViewLabel);
+				if (!text) {
+					return;
+				}
+				try {
+					await navigator.clipboard.writeText(text);
+					showCopyFeedback("コピーしました", true);
+				} catch (error) {
+					const textarea = document.createElement("textarea");
+					textarea.value = text;
+					textarea.style.position = "fixed";
+					textarea.style.opacity = "0";
+					document.body.appendChild(textarea);
+					textarea.focus();
+					textarea.select();
 					try {
-						await navigator.clipboard.writeText(text);
+						document.execCommand("copy");
 						showCopyFeedback("コピーしました", true);
-					} catch (error) {
-						const textarea = document.createElement("textarea");
-						textarea.value = text;
-						textarea.style.position = "fixed";
-						textarea.style.opacity = "0";
-						document.body.appendChild(textarea);
-						textarea.focus();
-						textarea.select();
-						try {
-							document.execCommand("copy");
-							showCopyFeedback("コピーしました", true);
-						} catch (fallbackError) {
-							showCopyFeedback("コピーに失敗しました", false);
-						} finally {
-							document.body.removeChild(textarea);
-						}
+					} catch (fallbackError) {
+						showCopyFeedback("コピーに失敗しました", false);
+					} finally {
+						document.body.removeChild(textarea);
 					}
 				}
+			}
 
 			async function fetchStatus() {
 				try {
@@ -676,108 +1086,115 @@
 					return;
 				}
 
-					const formData = new FormData();
-					const requestId = createRequestId();
-					activeRequestId = requestId;
-					formData.append("file", fileInput.files[0]);
+				const formData = new FormData();
+				const requestId = createRequestId();
+				activeRequestId = requestId;
+				formData.append("file", fileInput.files[0]);
 				formData.append("device", document.getElementById("device").value);
 				formData.append("dpi", document.getElementById("dpi").value);
 				formData.append("task", taskInput.value);
 				formData.append("linebreak_mode", document.getElementById("linebreak_mode").value);
 				formData.append("max_new_tokens", document.getElementById("max_new_tokens").value);
 				formData.append("temperature", document.getElementById("temperature").value);
+				formData.append("use_layout", useLayoutInput.value);
+				formData.append("layout_backend", layoutBackendInput.value);
+				formData.append("reading_order", readingOrderInput.value);
+				formData.append("region_padding", regionPaddingInput.value);
+				formData.append("max_regions", maxRegionsInput.value);
+				formData.append("region_parallelism", regionParallelismInput.value);
 				formData.append("request_id", requestId);
 				if (taskNeedsSchema(taskInput.value)) {
 					formData.append("schema", schemaInput.value);
 				}
 
-					setBusy(true, "事前処理中");
-					pageSelect.innerHTML = "";
-					pagePickerWrap.classList.add("hidden");
-						currentResults = [];
-						currentViewItem = null;
-						currentViewLabel = "";
-						copyBtn.disabled = true;
-						if (copyFeedbackTimer) {
-							clearTimeout(copyFeedbackTimer);
-							copyFeedbackTimer = null;
-						}
-						copyBtn.classList.remove("copied");
-						copyBtn.textContent = "コピー";
-					resultTask.textContent = `task: ${taskInput.value}`;
+				setBusy(true, "事前処理中");
+				pageSelect.innerHTML = "";
+				pagePickerWrap.classList.add("hidden");
+				resetCopyState();
+				currentResults = [];
+				resultTask.textContent = `task: ${taskInput.value}`;
 				resultLinebreak.textContent = `linebreak: ${document.getElementById("linebreak_mode").value}`;
 				resultPages.textContent = "pages: -";
 				resultDevice.textContent = "run device: -";
+				resultLayout.textContent = `layout: ${useLayoutInput.value}`;
+				resultOrder.textContent = `order: ${readingOrderInput.value}`;
 				renderLoading("事前処理中");
 				startProgressPolling(requestId);
 
-					try {
-						const res = await fetch("/api/analyze", { method: "POST", body: formData });
-						const payload = await res.json();
-						if (!res.ok) {
-							throw new Error(payload.detail || "API request failed");
-						}
-						stopProgressPolling();
-						activeRequestId = null;
+				try {
+					const res = await fetch("/api/analyze", { method: "POST", body: formData });
+					const payload = await res.json();
+					if (!res.ok) {
+						throw new Error(payload.detail || "API request failed");
+					}
+					stopProgressPolling();
+					activeRequestId = null;
 
-						currentResults = Array.isArray(payload.results) ? payload.results : [];
-						resultTask.textContent = `task: ${payload.task || "-"}`;
-						resultLinebreak.textContent = `linebreak: ${payload.linebreak_mode || "-"}`;
-						resultPages.textContent = `pages: ${payload.page_count || 0}`;
-						resultDevice.textContent = `run device: ${payload.device || "-"}`;
+					currentResults = Array.isArray(payload.results) ? payload.results : [];
+					currentMeta = {
+						useLayout: Boolean(payload.use_layout),
+						readingOrder: payload.reading_order || "-",
+						layoutBackend: payload.layout_backend || "-",
+					};
+					resultTask.textContent = `task: ${payload.task || "-"}`;
+					resultLinebreak.textContent = `linebreak: ${payload.linebreak_mode || "-"}`;
+					resultPages.textContent = `pages: ${payload.page_count || 0}`;
+					resultDevice.textContent = `run device: ${payload.device || "-"}`;
+					resultLayout.textContent = `layout: ${String(Boolean(payload.use_layout))} (${payload.layout_backend || "-"})`;
+					resultOrder.textContent = `order: ${payload.reading_order || "-"}`;
 
-						if (currentResults.length === 0) {
-							if (payload.state === "canceled") {
-								setError("中断しました。");
-							} else {
-								setError("結果が空です。");
-							}
-						} else {
-							renderPageSelector(currentResults);
-							renderAllPages();
-						}
+					if (currentResults.length === 0) {
 						if (payload.state === "canceled") {
-							setBusy(false, "中断");
+							setError("中断しました。");
 						} else {
-							setBusy(false, "完了");
+							setError("結果が空です。");
 						}
-					} catch (error) {
-						stopProgressPolling();
-						activeRequestId = null;
-						setError(`エラー: ${error.message}`);
-						setBusy(false, "失敗");
-					}
-				});
-
-				cancelBtn.addEventListener("click", async () => {
-					if (!activeRequestId) {
-						return;
-					}
-					const requestId = activeRequestId;
-					cancelBtn.disabled = true;
-					requestNote.textContent = "中断要求中...";
-					updateLoading("中断要求中...");
-					try {
-						const res = await fetch(`/api/cancel/${encodeURIComponent(requestId)}`, {
-							method: "POST",
-						});
-						const payload = await res.json();
-						if (!res.ok) {
-							throw new Error(payload.detail || "中断要求に失敗しました");
-						}
-						requestNote.textContent = payload.message || "中断要求を受け付けました";
-						updateLoading(payload.message || "中断要求を受け付けました");
-					} catch (error) {
-						requestNote.textContent = `中断要求失敗: ${error.message}`;
-						if (activeRequestId) {
-							cancelBtn.disabled = false;
-						}
-					}
-				});
-
-				pageSelect.addEventListener("change", () => {
-					if (pageSelect.value === "all") {
+					} else {
+						renderPageSelector(currentResults);
 						renderAllPages();
+					}
+					if (payload.state === "canceled") {
+						setBusy(false, "中断");
+					} else {
+						setBusy(false, "完了");
+					}
+				} catch (error) {
+					stopProgressPolling();
+					activeRequestId = null;
+					setError(`エラー: ${error.message}`);
+					setBusy(false, "失敗");
+				}
+			});
+
+			cancelBtn.addEventListener("click", async () => {
+				if (!activeRequestId) {
+					return;
+				}
+				const requestId = activeRequestId;
+				cancelBtn.disabled = true;
+				requestNote.textContent = "中断要求中...";
+				updateLoading("中断要求中...");
+				try {
+					const res = await fetch(`/api/cancel/${encodeURIComponent(requestId)}`, {
+						method: "POST",
+					});
+					const payload = await res.json();
+					if (!res.ok) {
+						throw new Error(payload.detail || "中断要求に失敗しました");
+					}
+					requestNote.textContent = payload.message || "中断要求を受け付けました";
+					updateLoading(payload.message || "中断要求を受け付けました");
+				} catch (error) {
+					requestNote.textContent = `中断要求失敗: ${error.message}`;
+					if (activeRequestId) {
+						cancelBtn.disabled = false;
+					}
+				}
+			});
+
+			pageSelect.addEventListener("change", () => {
+				if (pageSelect.value === "all") {
+					renderAllPages();
 					return;
 				}
 				const index = Number(pageSelect.value);
@@ -785,15 +1202,18 @@
 					renderAllPages();
 					return;
 				}
-					renderPage(index);
-				});
+				renderPage(index);
+			});
 
-				copyBtn.addEventListener("click", () => {
-					void copyCurrentView();
-				});
+			copyBtn.addEventListener("click", () => {
+				void copyCurrentView();
+			});
 
 			taskInput.addEventListener("change", toggleSchema);
+			useLayoutInput.addEventListener("change", toggleLayoutOptions);
 			toggleSchema();
+			toggleLayoutOptions();
+			setupHelpBubbles();
 			fetchStatus();
 		</script>
 	</body>

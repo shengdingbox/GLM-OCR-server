@@ -1,4 +1,6 @@
+import base64
 import asyncio
+import io
 import json
 import logging
 import os
@@ -14,13 +16,15 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from PIL import Image
+from PIL import Image, ImageDraw
 from transformers import (
     AutoModelForImageTextToText,
     AutoProcessor,
     StoppingCriteria,
     StoppingCriteriaList,
 )
+
+from app.layout_ppdoclayoutv3 import LayoutBlock, detect_layout_blocks
 
 MODEL_ID = "zai-org/GLM-OCR"
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -30,8 +34,16 @@ MODEL_CACHE_DIR = Path(
 DEFAULT_DPI = 220
 DEFAULT_MAX_NEW_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.0
+DEFAULT_USE_LAYOUT = False
+DEFAULT_LAYOUT_BACKEND = "ppdoclayoutv3"
+DEFAULT_READING_ORDER = "auto"
+DEFAULT_REGION_PADDING = 12
+DEFAULT_MAX_REGIONS = 200
+DEFAULT_REGION_PARALLELISM = 1
 ALLOWED_TASKS = {"text", "table", "formula", "extract_json"}
 ALLOWED_LINEBREAK_MODES = {"none", "paragraph", "compact"}
+ALLOWED_LAYOUT_BACKENDS = {"ppdoclayoutv3", "none"}
+ALLOWED_READING_ORDERS = {"auto", "ltr_ttb", "rtl_ttb", "vertical_rl"}
 
 logger = logging.getLogger("glm_ocr_server")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -338,6 +350,184 @@ def normalize_text_output(text: str, task: str, linebreak_mode: str) -> str:
     return normalize_linebreaks(normalized, linebreak_mode)
 
 
+def clamp_bbox_with_padding(
+    bbox: tuple[int, int, int, int],
+    image: Image.Image,
+    padding: int,
+) -> tuple[int, int, int, int]:
+    width, height = image.size
+    x1, y1, x2, y2 = bbox
+    pad = max(0, int(padding))
+    x1 = max(0, int(x1) - pad)
+    y1 = max(0, int(y1) - pad)
+    x2 = min(width, int(x2) + pad)
+    y2 = min(height, int(y2) + pad)
+    if x2 <= x1:
+        x2 = min(width, x1 + 1)
+    if y2 <= y1:
+        y2 = min(height, y1 + 1)
+    return (x1, y1, x2, y2)
+
+
+def bbox_dict(bbox: tuple[int, int, int, int]) -> dict[str, int]:
+    return {"x1": int(bbox[0]), "y1": int(bbox[1]), "x2": int(bbox[2]), "y2": int(bbox[3])}
+
+
+def normalize_layout_label(block_type: str) -> str:
+    lowered = (block_type or "text").strip().lower()
+    if lowered in {"formula", "equation"}:
+        return "formula"
+    if lowered in {"table"}:
+        return "table"
+    if lowered in {"figure", "image", "chart"}:
+        return "figure"
+    return lowered or "text"
+
+
+def resolve_effective_reading_order(
+    blocks: list[LayoutBlock],
+    requested_order: str,
+) -> str:
+    order = (requested_order or DEFAULT_READING_ORDER).strip().lower()
+    if order and order != "auto":
+        return order
+    if not blocks:
+        return "ltr_ttb"
+
+    widths = [max(1, b.bbox[2] - b.bbox[0]) for b in blocks]
+    heights = [max(1, b.bbox[3] - b.bbox[1]) for b in blocks]
+    tall_ratio = sum(1 for w, h in zip(widths, heights) if h > (w * 1.8)) / float(len(blocks))
+    narrow_ratio = sum(1 for w, h in zip(widths, heights) if w < (h * 0.65)) / float(len(blocks))
+
+    centers = sorted(((b.bbox[0] + b.bbox[2]) // 2) for b in blocks)
+    x_diffs = [centers[i + 1] - centers[i] for i in range(len(centers) - 1)]
+    largest_gap = max(x_diffs) if x_diffs else 0
+    span = max(1, centers[-1] - centers[0]) if len(centers) > 1 else 1
+    multi_column = (largest_gap / float(span)) > 0.35
+
+    if tall_ratio > 0.55 and narrow_ratio > 0.45:
+        return "vertical_rl"
+    if multi_column:
+        # For Japanese multi-column documents, right-to-left column order is common.
+        return "rtl_ttb"
+    return "ltr_ttb"
+
+
+def sort_blocks_ltr_or_rtl(
+    blocks: list[LayoutBlock],
+    rtl: bool,
+) -> list[LayoutBlock]:
+    if not blocks:
+        return []
+    avg_h = sum(max(1, b.bbox[3] - b.bbox[1]) for b in blocks) / float(len(blocks))
+    row_tol = max(8.0, avg_h * 0.45)
+
+    sorted_by_y = sorted(blocks, key=lambda b: (b.bbox[1], b.bbox[0]))
+    rows: list[list[LayoutBlock]] = []
+    for block in sorted_by_y:
+        if not rows:
+            rows.append([block])
+            continue
+        current = rows[-1]
+        avg_y = sum(item.bbox[1] for item in current) / float(len(current))
+        if abs(block.bbox[1] - avg_y) <= row_tol:
+            current.append(block)
+        else:
+            rows.append([block])
+
+    ordered: list[LayoutBlock] = []
+    for row in rows:
+        ordered.extend(sorted(row, key=lambda b: b.bbox[0], reverse=rtl))
+    return ordered
+
+
+def sort_blocks_vertical_rl(blocks: list[LayoutBlock]) -> list[LayoutBlock]:
+    if not blocks:
+        return []
+    avg_w = sum(max(1, b.bbox[2] - b.bbox[0]) for b in blocks) / float(len(blocks))
+    col_tol = max(8.0, avg_w * 0.5)
+
+    sorted_by_x = sorted(blocks, key=lambda b: b.bbox[0], reverse=True)
+    cols: list[list[LayoutBlock]] = []
+    for block in sorted_by_x:
+        if not cols:
+            cols.append([block])
+            continue
+        current = cols[-1]
+        avg_x = sum(item.bbox[0] for item in current) / float(len(current))
+        if abs(block.bbox[0] - avg_x) <= col_tol:
+            current.append(block)
+        else:
+            cols.append([block])
+
+    ordered: list[LayoutBlock] = []
+    for col in cols:
+        ordered.extend(sorted(col, key=lambda b: b.bbox[1]))
+    return ordered
+
+
+def sort_layout_blocks(blocks: list[LayoutBlock], reading_order: str) -> list[LayoutBlock]:
+    if reading_order == "vertical_rl":
+        return sort_blocks_vertical_rl(blocks)
+    if reading_order == "rtl_ttb":
+        return sort_blocks_ltr_or_rtl(blocks, rtl=True)
+    return sort_blocks_ltr_or_rtl(blocks, rtl=False)
+
+
+def block_prompt_for_task(global_task: str, block_type: str, schema: Optional[str]) -> str:
+    if global_task != "text":
+        return build_prompt(global_task, schema)
+    normalized_type = normalize_layout_label(block_type)
+    if normalized_type == "table":
+        return build_prompt("table", None)
+    if normalized_type == "formula":
+        return build_prompt("formula", None)
+    return build_prompt("text", None)
+
+
+def combine_block_texts(blocks: list[dict[str, Any]], linebreak_mode: str) -> str:
+    parts: list[str] = []
+    for block in blocks:
+        text = str(block.get("text") or "").strip()
+        if not text:
+            continue
+        block_type = normalize_layout_label(str(block.get("type") or "text"))
+        if block_type == "table":
+            parts.append(text)
+            parts.append("")
+            parts.append("")
+        else:
+            parts.append(text)
+            parts.append("")
+    if not parts:
+        return ""
+    combined = "\n".join(parts).strip()
+    return normalize_linebreaks(combined, linebreak_mode)
+
+
+def build_layout_preview_base64(
+    page: Image.Image,
+    blocks: list[dict[str, Any]],
+) -> str:
+    preview = page.copy()
+    drawer = ImageDraw.Draw(preview)
+    for item in blocks:
+        bbox = item.get("bbox") or {}
+        x1 = int(bbox.get("x1", 0))
+        y1 = int(bbox.get("y1", 0))
+        x2 = int(bbox.get("x2", x1 + 1))
+        y2 = int(bbox.get("y2", y1 + 1))
+        block_id = str(item.get("id") or "")
+        block_type = str(item.get("type") or "text")
+        drawer.rectangle((x1, y1, x2, y2), outline="#2563eb", width=2)
+        if block_id:
+            drawer.text((x1 + 2, y1 + 2), f"{block_id}:{block_type}", fill="#dc2626")
+    buffer = io.BytesIO()
+    preview.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return encoded
+
+
 def glm_infer(
     processor: AutoProcessor,
     model: AutoModelForImageTextToText,
@@ -346,7 +536,7 @@ def glm_infer(
     max_new_tokens: int,
     temperature: float,
     request_id: Optional[str] = None,
-) -> tuple[str, str]:
+) -> tuple[str, str, bool]:
     messages = [
         {
             "role": "user",
@@ -378,9 +568,11 @@ def glm_infer(
         generated = model.generate(**inputs, **generation_args)
     input_len = inputs["input_ids"].shape[1]
     output = generated[0][input_len:]
+    output_len = int(output.shape[0])
     raw_text = processor.decode(output, skip_special_tokens=False).strip()
     clean_text = processor.decode(output, skip_special_tokens=True).strip()
-    return raw_text, clean_text
+    truncated = output_len >= max(1, int(max_new_tokens))
+    return raw_text, clean_text, truncated
 
 
 RUNTIME = GlmRuntime()
@@ -396,6 +588,8 @@ def set_progress(
     message: str,
     current_page: int = 0,
     total_pages: int = 0,
+    current_region: int = 0,
+    total_regions: int = 0,
 ) -> None:
     PROGRESS_STATE[request_id] = {
         "request_id": request_id,
@@ -403,6 +597,8 @@ def set_progress(
         "message": message,
         "current_page": int(current_page),
         "total_pages": int(total_pages),
+        "current_region": int(current_region),
+        "total_regions": int(total_regions),
         "updated_at": time.time(),
     }
     if len(PROGRESS_STATE) > MAX_PROGRESS_ENTRIES:
@@ -461,6 +657,8 @@ def request_cancel(request_id: str) -> dict[str, Any]:
         "中断要求を受け付けました",
         int(item.get("current_page") or 0),
         int(item.get("total_pages") or 0),
+        int(item.get("current_region") or 0),
+        int(item.get("total_regions") or 0),
     )
     return {
         "request_id": request_id,
@@ -543,6 +741,12 @@ async def analyze(
     schema: Optional[str] = Form(None),
     max_new_tokens: int = Form(DEFAULT_MAX_NEW_TOKENS),
     temperature: float = Form(DEFAULT_TEMPERATURE),
+    use_layout: bool = Form(DEFAULT_USE_LAYOUT),
+    layout_backend: str = Form(DEFAULT_LAYOUT_BACKEND),
+    reading_order: str = Form(DEFAULT_READING_ORDER),
+    region_padding: int = Form(DEFAULT_REGION_PADDING),
+    max_regions: int = Form(DEFAULT_MAX_REGIONS),
+    region_parallelism: int = Form(DEFAULT_REGION_PARALLELISM),
     request_id: Optional[str] = Form(None),
 ) -> dict[str, Any]:
     request_id = (request_id or "").strip() or uuid.uuid4().hex
@@ -565,6 +769,42 @@ async def analyze(
         raise HTTPException(
             status_code=400, detail=f"Unsupported linebreak_mode: {linebreak_mode}"
         )
+    normalized_layout_backend = (layout_backend or DEFAULT_LAYOUT_BACKEND).strip().lower()
+    if normalized_layout_backend not in ALLOWED_LAYOUT_BACKENDS:
+        set_progress(
+            request_id,
+            "error",
+            f"Unsupported layout_backend: {layout_backend}",
+            0,
+            0,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported layout_backend: {layout_backend}",
+        )
+    normalized_reading_order = (reading_order or DEFAULT_READING_ORDER).strip().lower()
+    if normalized_reading_order not in ALLOWED_READING_ORDERS:
+        set_progress(
+            request_id,
+            "error",
+            f"Unsupported reading_order: {reading_order}",
+            0,
+            0,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported reading_order: {reading_order}",
+        )
+
+    normalized_dpi = max(36, min(600, int(dpi or DEFAULT_DPI)))
+    normalized_max_new_tokens = max(1, min(32768, int(max_new_tokens or DEFAULT_MAX_NEW_TOKENS)))
+    normalized_region_padding = max(0, min(256, int(region_padding or DEFAULT_REGION_PADDING)))
+    normalized_max_regions = max(1, min(1000, int(max_regions or DEFAULT_MAX_REGIONS)))
+    normalized_region_parallelism = max(
+        1,
+        min(8, int(region_parallelism or DEFAULT_REGION_PARALLELISM)),
+    )
+    use_layout_mode = bool(use_layout)
 
     try:
         prompt = build_prompt(normalized_task, schema)
@@ -583,7 +823,7 @@ async def analyze(
     try:
         content = await file.read()
         input_path = save_temp_upload(file.filename or "upload.bin", content)
-        pages = load_pages(input_path, dpi)
+        pages = load_pages(input_path, normalized_dpi)
     except HTTPException:
         clear_cancel_request(request_id)
         raise
@@ -603,91 +843,268 @@ async def analyze(
         "OCR準備完了",
         0,
         total_pages,
+        0,
+        0,
     )
+
+    def build_response(state: str, response_results: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "request_id": request_id,
+            "device": actual_device,
+            "task": normalized_task,
+            "linebreak_mode": normalized_linebreak_mode,
+            "use_layout": use_layout_mode,
+            "layout_backend": normalized_layout_backend,
+            "reading_order": normalized_reading_order,
+            "region_padding": normalized_region_padding,
+            "max_regions": normalized_max_regions,
+            "region_parallelism": normalized_region_parallelism,
+            "state": state,
+            "page_count": len(pages),
+            "results": response_results,
+        }
+
+    def build_canceled_response(
+        response_results: list[dict[str, Any]],
+        completed_pages: int,
+        current_region: int = 0,
+        total_regions_for_page: int = 0,
+    ) -> dict[str, Any]:
+        set_progress(
+            request_id,
+            "canceled",
+            "中断しました",
+            max(0, completed_pages),
+            total_pages,
+            current_region,
+            total_regions_for_page,
+        )
+        clear_cancel_request(request_id)
+        return build_response("canceled", response_results)
 
     results: list[dict[str, Any]] = []
     try:
         for index, page in enumerate(pages, start=1):
             if is_cancel_requested(request_id):
+                return build_canceled_response(results, index - 1)
+
+            if not use_layout_mode:
                 set_progress(
                     request_id,
-                    "canceled",
-                    "中断しました",
-                    max(0, index - 1),
+                    "ocr",
+                    f"{index}/{total_pages}ページをOCR中",
+                    index,
                     total_pages,
+                    0,
+                    0,
                 )
-                clear_cancel_request(request_id)
-                return {
-                    "request_id": request_id,
-                    "device": actual_device,
-                    "task": normalized_task,
-                    "linebreak_mode": normalized_linebreak_mode,
-                    "state": "canceled",
-                    "page_count": len(pages),
-                    "results": results,
+                page_path = save_temp_png(page)
+                try:
+                    async with GENERATE_SEMAPHORE:
+                        raw_text, clean_text, truncated = await asyncio.to_thread(
+                            glm_infer,
+                            processor,
+                            model,
+                            str(page_path),
+                            prompt,
+                            normalized_max_new_tokens,
+                            temperature,
+                            request_id,
+                        )
+                finally:
+                    page_path.unlink(missing_ok=True)
+
+                if is_cancel_requested(request_id):
+                    return build_canceled_response(results, index - 1)
+
+                item: dict[str, Any] = {
+                    "page": index,
+                    "text": (
+                        normalize_text_output(
+                            clean_text,
+                            normalized_task,
+                            normalized_linebreak_mode,
+                        )
+                        if normalized_task != "extract_json"
+                        else clean_text
+                    ),
+                    "raw": raw_text,
+                    "json": None,
+                    "truncated": bool(truncated),
                 }
+                if normalized_task == "extract_json":
+                    try:
+                        item["json"] = json.loads(clean_text)
+                    except json.JSONDecodeError as exc:
+                        item["error"] = f"JSON parse failed: {exc.msg}"
+                results.append(item)
+                continue
+
             set_progress(
                 request_id,
                 "ocr",
-                f"{index}/{total_pages}ページをOCR中",
+                f"{index}/{total_pages}ページのレイアウト解析中",
                 index,
                 total_pages,
+                0,
+                0,
             )
-            page_path = save_temp_png(page)
-            try:
-                async with GENERATE_SEMAPHORE:
-                    raw_text, clean_text = await asyncio.to_thread(
-                        glm_infer,
-                        processor,
-                        model,
-                        str(page_path),
-                        prompt,
-                        max_new_tokens,
-                        temperature,
-                        request_id,
-                    )
-            finally:
-                page_path.unlink(missing_ok=True)
-
-            if is_cancel_requested(request_id):
-                set_progress(
-                    request_id,
-                    "canceled",
-                    "中断しました",
-                    max(0, index - 1),
-                    total_pages,
+            raw_layout_blocks = await asyncio.to_thread(
+                detect_layout_blocks,
+                page,
+                normalized_layout_backend,
+            )
+            padded_blocks = [
+                LayoutBlock(
+                    type=normalize_layout_label(block.type),
+                    bbox=clamp_bbox_with_padding(block.bbox, page, normalized_region_padding),
+                    score=float(block.score),
                 )
-                clear_cancel_request(request_id)
-                return {
-                    "request_id": request_id,
-                    "device": actual_device,
-                    "task": normalized_task,
-                    "linebreak_mode": normalized_linebreak_mode,
-                    "state": "canceled",
-                    "page_count": len(pages),
-                    "results": results,
-                }
+                for block in raw_layout_blocks
+            ]
+            if not padded_blocks:
+                width, height = page.size
+                padded_blocks = [LayoutBlock(type="text", bbox=(0, 0, width, height), score=1.0)]
 
-            item: dict[str, Any] = {
-                "page": index,
-                "text": (
-                    normalize_text_output(
-                        clean_text,
+            effective_order = resolve_effective_reading_order(padded_blocks, normalized_reading_order)
+            ordered_blocks = sort_layout_blocks(padded_blocks, effective_order)[:normalized_max_regions]
+            total_regions_for_page = len(ordered_blocks)
+            if total_regions_for_page == 0:
+                width, height = page.size
+                ordered_blocks = [LayoutBlock(type="text", bbox=(0, 0, width, height), score=1.0)]
+                total_regions_for_page = 1
+
+            set_progress(
+                request_id,
+                "ocr",
+                f"{index}/{total_pages} pages, 0/{total_regions_for_page} regions",
+                index,
+                total_pages,
+                0,
+                total_regions_for_page,
+            )
+
+            region_semaphore = asyncio.Semaphore(normalized_region_parallelism)
+
+            async def infer_region(
+                region_index: int,
+                layout_block: LayoutBlock,
+            ) -> tuple[int, dict[str, Any]]:
+                item: dict[str, Any] = {
+                    "id": f"b{region_index + 1}",
+                    "type": normalize_layout_label(layout_block.type),
+                    "bbox": bbox_dict(layout_block.bbox),
+                    "text": "",
+                    "raw": "",
+                    "truncated": False,
+                }
+                if is_cancel_requested(request_id):
+                    item["error"] = "canceled"
+                    return region_index, item
+
+                crop = page.crop(layout_block.bbox)
+                crop_path = save_temp_png(crop)
+                try:
+                    region_prompt = block_prompt_for_task(
                         normalized_task,
-                        normalized_linebreak_mode,
+                        layout_block.type,
+                        schema,
                     )
-                    if normalized_task != "extract_json"
-                    else clean_text
-                ),
-                "raw": raw_text,
+                    async with region_semaphore:
+                        raw_text, clean_text, truncated = await asyncio.to_thread(
+                            glm_infer,
+                            processor,
+                            model,
+                            str(crop_path),
+                            region_prompt,
+                            normalized_max_new_tokens,
+                            temperature,
+                            request_id,
+                        )
+                    item["raw"] = raw_text
+                    item["text"] = (
+                        clean_text
+                        if normalized_task == "extract_json"
+                        else normalize_text_output(
+                            clean_text,
+                            normalized_task,
+                            "none",
+                        )
+                    )
+                    item["truncated"] = bool(truncated)
+                except Exception as exc:
+                    item["error"] = str(exc)
+                finally:
+                    crop_path.unlink(missing_ok=True)
+                return region_index, item
+
+            block_results: list[Optional[dict[str, Any]]] = [None] * total_regions_for_page
+            completed_regions = 0
+            for start in range(0, total_regions_for_page, normalized_region_parallelism):
+                if is_cancel_requested(request_id):
+                    return build_canceled_response(
+                        results,
+                        index - 1,
+                        completed_regions,
+                        total_regions_for_page,
+                    )
+                batch = ordered_blocks[start : start + normalized_region_parallelism]
+                batch_jobs = [
+                    infer_region(start + offset, block) for offset, block in enumerate(batch)
+                ]
+                batch_outputs = await asyncio.gather(*batch_jobs)
+                for output_index, block_item in batch_outputs:
+                    block_results[output_index] = block_item
+                    completed_regions += 1
+                    set_progress(
+                        request_id,
+                        "ocr",
+                        f"{index}/{total_pages} pages, {completed_regions}/{total_regions_for_page} regions",
+                        index,
+                        total_pages,
+                        completed_regions,
+                        total_regions_for_page,
+                    )
+                    if is_cancel_requested(request_id):
+                        return build_canceled_response(
+                            results,
+                            index - 1,
+                            completed_regions,
+                            total_regions_for_page,
+                        )
+
+            page_blocks = [item for item in block_results if item is not None]
+            combined_text = combine_block_texts(
+                page_blocks,
+                normalized_linebreak_mode if normalized_task != "extract_json" else "none",
+            )
+            combined_raw = "\n\n".join(
+                str(item.get("raw") or "").strip() for item in page_blocks if item
+            ).strip()
+            page_item: dict[str, Any] = {
+                "page": index,
+                "text": combined_text,
+                "raw": combined_raw,
                 "json": None,
+                "blocks": page_blocks,
+                "reading_order": effective_order,
+                "layout_preview_base64": build_layout_preview_base64(page, page_blocks),
             }
+            block_errors = [
+                f"{block.get('id')}: {block.get('error')}"
+                for block in page_blocks
+                if block.get("error")
+            ]
+            if block_errors:
+                page_item["error"] = "\n".join(block_errors)
             if normalized_task == "extract_json":
                 try:
-                    item["json"] = json.loads(clean_text)
+                    page_item["json"] = json.loads(combined_text)
                 except json.JSONDecodeError as exc:
-                    item["error"] = f"JSON parse failed: {exc.msg}"
-            results.append(item)
+                    page_item["error"] = (
+                        f"{page_item.get('error', '')}\nJSON parse failed: {exc.msg}".strip()
+                    )
+            results.append(page_item)
     except HTTPException:
         clear_cancel_request(request_id)
         set_progress(request_id, "error", "APIエラー", 0, total_pages)
@@ -698,15 +1115,7 @@ async def analyze(
         set_progress(request_id, "error", f"推論エラー: {exc}", 0, total_pages)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    set_progress(request_id, "done", "完了", total_pages, total_pages)
+    set_progress(request_id, "done", "完了", total_pages, total_pages, 0, 0)
     clear_cancel_request(request_id)
 
-    return {
-        "request_id": request_id,
-        "device": actual_device,
-        "task": normalized_task,
-        "linebreak_mode": normalized_linebreak_mode,
-        "state": "done",
-        "page_count": len(pages),
-        "results": results,
-    }
+    return build_response("done", results)

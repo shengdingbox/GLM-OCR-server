@@ -75,6 +75,14 @@ PY
 echo "[+] Installing FastAPI and image/PDF dependencies..."
 python -m pip install fastapi uvicorn python-multipart pillow pypdfium2 accelerate
 
+echo "[+] Installing optional layout dependencies (PaddleOCR)..."
+if ! python -m pip install --upgrade paddlepaddle; then
+  echo "[!] paddlepaddle install failed. Layout OCR will use fallback mode."
+fi
+if ! python -m pip install --upgrade paddleocr; then
+  echo "[!] paddleocr install failed. Layout OCR will use fallback mode."
+fi
+
 echo "[+] Installing transformers (development build)..."
 python -m pip install git+https://github.com/huggingface/transformers.git
 
