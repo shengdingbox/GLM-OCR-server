@@ -41,3 +41,6 @@ app/static/out/
 
 # Local backup copies
 app - */
+
+# etc
+local-notes/
