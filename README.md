@@ -3,6 +3,8 @@
 `zai-org/GLM-OCR` を使ったローカルOCRサーバーです。  
 FastAPI + シンプルなWeb UIで、画像/PDFをページ単位でOCRできます。
 
+![GLM-OCR UI](image.jpg)
+
 ## 主な機能
 
 - GLM-OCR推論（`text` / `table` / `formula` / `extract_json`）
@@ -102,4 +104,3 @@ CUDA可否やモデルID、キャッシュディレクトリを返します。
 
 - このプロジェクト: `LICENSE`（MIT）
 - サードパーティ情報: `THIRD_PARTY_NOTICES.md`
-
