@@ -302,6 +302,42 @@ def normalize_linebreaks(text: str, mode: str) -> str:
     )
 
 
+def circled_number(num: int) -> Optional[str]:
+    if num == 0:
+        return "⓪"
+    if 1 <= num <= 20:
+        return chr(ord("①") + (num - 1))
+    if 21 <= num <= 35:
+        return chr(0x3251 + (num - 21))
+    if 36 <= num <= 50:
+        return chr(0x32B1 + (num - 36))
+    return None
+
+
+def normalize_textcircled_notation(text: str) -> str:
+    if not text:
+        return text
+
+    def replace_match(match: re.Match[str]) -> str:
+        raw = (match.group(1) or "").strip()
+        if not raw.isdigit():
+            return match.group(0)
+        symbol = circled_number(int(raw))
+        return symbol or match.group(0)
+
+    # Convert both "$\\textcircled{1}$" and "\\textcircled{1}".
+    text = re.sub(r"\$\s*\\textcircled\{(\d+)\}\s*\$", replace_match, text)
+    text = re.sub(r"\\textcircled\{(\d+)\}", replace_match, text)
+    return text
+
+
+def normalize_text_output(text: str, task: str, linebreak_mode: str) -> str:
+    normalized = text
+    if task in {"text", "table"}:
+        normalized = normalize_textcircled_notation(normalized)
+    return normalize_linebreaks(normalized, linebreak_mode)
+
+
 def glm_infer(
     processor: AutoProcessor,
     model: AutoModelForImageTextToText,
@@ -635,7 +671,11 @@ async def analyze(
             item: dict[str, Any] = {
                 "page": index,
                 "text": (
-                    normalize_linebreaks(clean_text, normalized_linebreak_mode)
+                    normalize_text_output(
+                        clean_text,
+                        normalized_task,
+                        normalized_linebreak_mode,
+                    )
                     if normalized_task != "extract_json"
                     else clean_text
                 ),
