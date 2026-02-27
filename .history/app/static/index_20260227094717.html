@@ -593,15 +593,15 @@
 										<label>
 											<span class="label-title"
 												>max_regions
-							<button
-								class="help-trigger"
-								type="button"
-								data-help="单页处理的区域上限。用于防止异常，超出部分会被截断。"
-								aria-label="max_regions说明"
-							>
-								?
-							</button>
-						</span>
+												<button
+													class="help-trigger"
+													type="button"
+													data-help="1ページで処理する領域の上限です。暴走防止用で、超過分は切り捨てます。"
+													aria-label="max_regionsの説明"
+												>
+													?
+												</button>
+											</span>
 											<input
 												id="max_regions"
 												name="max_regions"
@@ -614,15 +614,15 @@
 										<label>
 											<span class="label-title"
 												>region_parallelism
-							<button
-								class="help-trigger"
-								type="button"
-								data-help="同时运行的区域推理数。1最为安全，增加可能会加快速度但会增加VRAM使用量。"
-								aria-label="region_parallelism说明"
-							>
-								?
-							</button>
-						</span>
+												<button
+													class="help-trigger"
+													type="button"
+													data-help="同時に回す領域推論数です。1が安全で、上げると速くなる場合がありますがVRAM使用量は増えます。"
+													aria-label="region_parallelismの説明"
+												>
+													?
+												</button>
+											</span>
 											<input
 												id="region_parallelism"
 												name="region_parallelism"
@@ -636,38 +636,38 @@
 								</fieldset>
 
 								<fieldset class="form-group">
-									<legend>品质</legend>
+									<legend>品質</legend>
 									<div class="group-grid">
 										<label>
 											<span class="label-title"
-												>换行处理
-							<button
-								class="help-trigger"
-								type="button"
-								data-help="OCR后的换行整形模式。none为保持原样，paragraph为维持段落，compact为强烈压缩换行。"
-								aria-label="换行处理说明"
-							>
-								?
-							</button>
-						</span>
-						<select id="linebreak_mode" name="linebreak_mode">
-							<option value="none" selected>不处理</option>
-							<option value="paragraph">段落整形（空行维持）</option>
-							<option value="compact">强力整形（换行几乎去除）</option>
-						</select>
+												>改行処理
+												<button
+													class="help-trigger"
+													type="button"
+													data-help="OCR後の改行整形モードです。noneはそのまま、paragraphは段落維持、compactは改行を強く圧縮します。"
+													aria-label="改行処理の説明"
+												>
+													?
+												</button>
+											</span>
+											<select id="linebreak_mode" name="linebreak_mode">
+												<option value="none" selected>処理しない</option>
+												<option value="paragraph">段落整形（空行維持）</option>
+												<option value="compact">強力整形（改行ほぼ除去）</option>
+											</select>
 										</label>
 										<label>
 											<span class="label-title"
 												>dpi (PDF only)
-							<button
-								class="help-trigger"
-								type="button"
-								data-help="PDF转换为图像的分辨率。越高越精细，但会增加处理时间和内存消耗。"
-								aria-label="dpi说明"
-							>
-								?
-							</button>
-						</span>
+												<button
+													class="help-trigger"
+													type="button"
+													data-help="PDFを画像化する解像度です。高いほど精細ですが処理時間とメモリ消費が増えます。"
+													aria-label="dpiの説明"
+												>
+													?
+												</button>
+											</span>
 											<input
 												id="dpi"
 												name="dpi"
@@ -680,15 +680,15 @@
 										<label>
 											<span class="label-title"
 												>max_new_tokens
-							<button
-								class="help-trigger"
-								type="button"
-								data-help="单次生成的token上限。越大可以返回越长的文本，但会更慢。"
-								aria-label="max_new_tokens说明"
-							>
-								?
-							</button>
-						</span>
+												<button
+													class="help-trigger"
+													type="button"
+													data-help="1回の生成トークン上限です。大きいほど長文を返せますが遅くなります。"
+													aria-label="max_new_tokensの説明"
+												>
+													?
+												</button>
+											</span>
 											<input
 												id="max_new_tokens"
 												name="max_new_tokens"
@@ -701,15 +701,15 @@
 										<label>
 											<span class="label-title"
 												>temperature
-							<button
-								class="help-trigger"
-								type="button"
-								data-help="生成的随机性。0最具确定性，值越大越多样。"
-								aria-label="temperature说明"
-							>
-								?
-							</button>
-						</span>
+												<button
+													class="help-trigger"
+													type="button"
+													data-help="生成のランダム性です。0は最も決定的、値を上げると多様になります。"
+													aria-label="temperatureの説明"
+												>
+													?
+												</button>
+											</span>
 											<input
 												id="temperature"
 												name="temperature"
@@ -724,20 +724,20 @@
 								</fieldset>
 
 								<fieldset class="form-group">
-									<legend>执行</legend>
+									<legend>実行</legend>
 									<div class="group-grid">
 										<label>
 											<span class="label-title"
 												>device
-							<button
-								class="help-trigger"
-								type="button"
-								data-help="用于推理的计算设备。auto会在CUDA可用时选择GPU，不可用时选择CPU。"
-								aria-label="device说明"
-							>
-								?
-							</button>
-						</span>
+												<button
+													class="help-trigger"
+													type="button"
+													data-help="推論に使う計算デバイスです。autoはCUDA利用可ならGPU、不可ならCPUを選びます。"
+													aria-label="deviceの説明"
+												>
+													?
+												</button>
+											</span>
 											<select id="device" name="device">
 												<option value="auto" selected>auto</option>
 												<option value="cuda">cuda</option>
@@ -749,16 +749,16 @@
 							</div>
 						</details>
 						<div class="actions">
-							<button id="submitBtn" type="submit">执行</button>
-						<button
-						id="cancelBtn"
-						class="button-secondary hidden"
-						type="button"
-						disabled
-					>
-						中断
-					</button>
-					<span class="note" id="requestNote">等待中</span>
+							<button id="submitBtn" type="submit">実行</button>
+							<button
+							id="cancelBtn"
+							class="button-secondary hidden"
+							type="button"
+							disabled
+						>
+							中断
+						</button>
+						<span class="note" id="requestNote">待機中</span>
 					</div>
 				</form>
 			</section>
@@ -772,16 +772,16 @@
 						<span class="tag" id="resultLayout">layout: -</span>
 						<span class="tag" id="resultOrder">order: -</span>
 						<button id="copyBtn" class="button-copy" type="button" disabled>
-						复制
-					</button>
+							コピー
+						</button>
 					</div>
 				<div class="page-picker hidden" id="pagePickerWrap">
-					<label for="pageSelect">显示页面</label>
+					<label for="pageSelect">表示ページ</label>
 					<select id="pageSelect"></select>
 				</div>
 				<div class="result-body" id="resultBody">
 					<div class="card">
-						<pre>这里将显示分析结果。</pre>
+						<pre>ここに解析結果が表示されます。</pre>
 					</div>
 				</div>
 			</section>
@@ -869,11 +869,11 @@
 						return;
 					}
 					if (fileInput && fileInput.files && fileInput.files.length > 0) {
-						fileDropText.innerHTML = `<strong>已选择:</strong>${fileInput.files[0].name}`;
+						fileDropText.innerHTML = `<strong>選択中:</strong>${fileInput.files[0].name}`;
 						return;
 					}
 					fileDropText.innerHTML =
-						"<strong>拖放文件</strong>或点击选择文件";
+						"<strong>ドラッグ&ドロップ</strong>またはクリックしてファイルを選択";
 				}
 
 				function setupFileDropzone() {
@@ -953,15 +953,15 @@
 			}
 
 			function resetCopyState() {
-					currentViewItem = null;
-					currentViewLabel = "";
-					copyBtn.disabled = true;
-					if (copyFeedbackTimer) {
-						clearTimeout(copyFeedbackTimer);
-						copyFeedbackTimer = null;
-					}
-					copyBtn.classList.remove("copied");
-					copyBtn.textContent = "复制";
+				currentViewItem = null;
+				currentViewLabel = "";
+				copyBtn.disabled = true;
+				if (copyFeedbackTimer) {
+					clearTimeout(copyFeedbackTimer);
+					copyFeedbackTimer = null;
+				}
+				copyBtn.classList.remove("copied");
+				copyBtn.textContent = "コピー";
 			}
 
 			function setError(message) {
@@ -975,7 +975,7 @@
 				resultBody.appendChild(card);
 			}
 
-			function renderLoading(message = "分析中... 请稍候。") {
+			function renderLoading(message = "解析中... しばらくお待ちください。") {
 				resetCopyState();
 				resultBody.innerHTML = "";
 				const card = document.createElement("div");
@@ -1017,7 +1017,7 @@
 							return;
 						}
 						const payload = await res.json();
-						const message = payload.message || "分析中...";
+						const message = payload.message || "解析中...";
 						setBusy(true, message);
 						updateLoading(message);
 						if (payload.total_pages && Number(payload.total_pages) > 0) {
@@ -1129,7 +1129,7 @@
 					copyFeedbackTimer = null;
 				}
 				copyBtn.classList.remove("copied");
-				copyBtn.textContent = "复制";
+				copyBtn.textContent = "コピー";
 				resultBody.innerHTML = "";
 
 				if (item.layout_preview_base64) {
@@ -1173,7 +1173,7 @@
 			function renderPage(index) {
 				const item = currentResults[index];
 				if (!item) {
-					setError("未找到结果页面。");
+					setError("結果のページが見つかりません。");
 					return;
 				}
 				if (item.reading_order) {
@@ -1214,11 +1214,11 @@
 					copyFeedbackTimer = null;
 				}
 				copyBtn.classList.toggle("copied", copied);
-				copyBtn.textContent = copied ? "已复制" : "复制";
+				copyBtn.textContent = copied ? "コピー済み" : "コピー";
 				if (copied) {
 					copyFeedbackTimer = setTimeout(() => {
 						copyBtn.classList.remove("copied");
-						copyBtn.textContent = "复制";
+						copyBtn.textContent = "コピー";
 						copyFeedbackTimer = null;
 					}, 1200);
 				}
@@ -1231,7 +1231,7 @@
 				}
 				try {
 					await navigator.clipboard.writeText(text);
-					showCopyFeedback("已复制", true);
+					showCopyFeedback("コピーしました", true);
 				} catch (error) {
 					const textarea = document.createElement("textarea");
 					textarea.value = text;
@@ -1242,9 +1242,9 @@
 					textarea.select();
 					try {
 						document.execCommand("copy");
-						showCopyFeedback("已复制", true);
+						showCopyFeedback("コピーしました", true);
 					} catch (fallbackError) {
-						showCopyFeedback("复制失败", false);
+						showCopyFeedback("コピーに失敗しました", false);
 					} finally {
 						document.body.removeChild(textarea);
 					}
@@ -1273,9 +1273,9 @@
 			form.addEventListener("submit", async (event) => {
 				event.preventDefault();
 				if (!fileInput.files || fileInput.files.length === 0) {
-										setError("请选择文件。");
-										return;
-									}
+					setError("ファイルを選択してください。");
+					return;
+				}
 
 				const formData = new FormData();
 				const requestId = createRequestId();
@@ -1298,18 +1298,18 @@
 					formData.append("schema", schemaInput.value);
 				}
 
-				setBusy(true, "预处理中");
-									pageSelect.innerHTML = "";
-									pagePickerWrap.classList.add("hidden");
-									resetCopyState();
-									currentResults = [];
-									resultTask.textContent = `task: ${taskInput.value}`;
-									resultLinebreak.textContent = `linebreak: ${document.getElementById("linebreak_mode").value}`;
-									resultPages.textContent = "pages: -";
-									resultDevice.textContent = "run device: -";
-									resultLayout.textContent = `layout: ${useLayoutInput.value}`;
-									resultOrder.textContent = `order: ${readingOrderInput.value}`;
-									renderLoading("预处理中");
+				setBusy(true, "事前処理中");
+				pageSelect.innerHTML = "";
+				pagePickerWrap.classList.add("hidden");
+				resetCopyState();
+				currentResults = [];
+				resultTask.textContent = `task: ${taskInput.value}`;
+				resultLinebreak.textContent = `linebreak: ${document.getElementById("linebreak_mode").value}`;
+				resultPages.textContent = "pages: -";
+				resultDevice.textContent = "run device: -";
+				resultLayout.textContent = `layout: ${useLayoutInput.value}`;
+				resultOrder.textContent = `order: ${readingOrderInput.value}`;
+				renderLoading("事前処理中");
 				startProgressPolling(requestId);
 
 				try {
@@ -1335,25 +1335,25 @@
 					resultOrder.textContent = `order: ${payload.reading_order || "-"}`;
 
 					if (currentResults.length === 0) {
-											if (payload.state === "canceled") {
-												setError("已中断。");
-											} else {
-												setError("结果为空。");
-											}
-										} else {
-											renderPageSelector(currentResults);
-											renderAllPages();
-										}
-										if (payload.state === "canceled") {
-											setBusy(false, "中断");
-										} else {
-											setBusy(false, "完成");
-										}
+						if (payload.state === "canceled") {
+							setError("中断しました。");
+						} else {
+							setError("結果が空です。");
+						}
+					} else {
+						renderPageSelector(currentResults);
+						renderAllPages();
+					}
+					if (payload.state === "canceled") {
+						setBusy(false, "中断");
+					} else {
+						setBusy(false, "完了");
+					}
 				} catch (error) {
 					stopProgressPolling();
 					activeRequestId = null;
-					setError(`错误: ${error.message}`);
-									setBusy(false, "失败");
+					setError(`エラー: ${error.message}`);
+					setBusy(false, "失敗");
 				}
 			});
 
@@ -1363,20 +1363,20 @@
 				}
 				const requestId = activeRequestId;
 				cancelBtn.disabled = true;
-									requestNote.textContent = "中断请求中...";
-									updateLoading("中断请求中...");
-									try {
-										const res = await fetch(`/api/cancel/${encodeURIComponent(requestId)}`, {
-											method: "POST",
-										});
-										const payload = await res.json();
-										if (!res.ok) {
-											throw new Error(payload.detail || "中断请求失败");
-										}
-										requestNote.textContent = payload.message || "已接受中断请求";
-										updateLoading(payload.message || "已接受中断请求");
+				requestNote.textContent = "中断要求中...";
+				updateLoading("中断要求中...");
+				try {
+					const res = await fetch(`/api/cancel/${encodeURIComponent(requestId)}`, {
+						method: "POST",
+					});
+					const payload = await res.json();
+					if (!res.ok) {
+						throw new Error(payload.detail || "中断要求に失敗しました");
+					}
+					requestNote.textContent = payload.message || "中断要求を受け付けました";
+					updateLoading(payload.message || "中断要求を受け付けました");
 				} catch (error) {
-					requestNote.textContent = `中断请求失败: ${error.message}`;
+					requestNote.textContent = `中断要求失敗: ${error.message}`;
 					if (activeRequestId) {
 						cancelBtn.disabled = false;
 					}

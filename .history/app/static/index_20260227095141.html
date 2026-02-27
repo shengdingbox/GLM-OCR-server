@@ -1214,7 +1214,7 @@
 					copyFeedbackTimer = null;
 				}
 				copyBtn.classList.toggle("copied", copied);
-				copyBtn.textContent = copied ? "已复制" : "复制";
+				copyBtn.textContent = copied ? "コピー済み" : "コピー";
 				if (copied) {
 					copyFeedbackTimer = setTimeout(() => {
 						copyBtn.classList.remove("copied");
@@ -1231,7 +1231,7 @@
 				}
 				try {
 					await navigator.clipboard.writeText(text);
-					showCopyFeedback("已复制", true);
+					showCopyFeedback("コピーしました", true);
 				} catch (error) {
 					const textarea = document.createElement("textarea");
 					textarea.value = text;
@@ -1242,9 +1242,9 @@
 					textarea.select();
 					try {
 						document.execCommand("copy");
-						showCopyFeedback("已复制", true);
+						showCopyFeedback("コピーしました", true);
 					} catch (fallbackError) {
-						showCopyFeedback("复制失败", false);
+						showCopyFeedback("コピーに失敗しました", false);
 					} finally {
 						document.body.removeChild(textarea);
 					}
